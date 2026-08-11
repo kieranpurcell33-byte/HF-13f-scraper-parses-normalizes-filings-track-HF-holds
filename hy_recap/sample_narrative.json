@@ -1,0 +1,32 @@
+{
+  "_comment": "Editorial narrative + triangulated level overrides for the 2026-08-10 session, delivered 2026-08-11. In normal operation `levels` is omitted and figures come live from FRED/Treasury; it is included here because this run had no market-data network access. Replace daily.",
+  "fund_flow_note": "Positive — largest weekly inflow in over a month",
+  "levels": [
+    {"label": "HY OAS", "value": 266, "unit": "bps", "change": -3, "as_of": "2026-08-10"},
+    {"label": "HY yield-to-worst", "value": 7.05, "unit": "%", "change": -0.04, "as_of": "2026-08-10"},
+    {"label": "UST 10Y", "value": 4.65, "unit": "%", "change": 0.0, "as_of": "2026-08-10"},
+    {"label": "UST 30Y", "value": 5.25, "unit": "%", "change": 0.05, "as_of": "2026-08-10"},
+    {"label": "WTI crude", "value": 77.0, "unit": "$/bbl", "change": -0.6, "as_of": "2026-08-10"}
+  ],
+  "notable_events": [
+    "**Dovish rate repricing drove the tape.** After Friday's (Aug 7) weaker-than-expected July jobs report, the market leaned further into cuts; steady/lower belly yields gave credit risk a hospitable backdrop. Next FOMC is Sept 16 — July CPI (Aug 12) is the near-term swing factor.",
+    "**Primary market roared back on the reopen.** The high-grade market had its busiest issuance day in ~7 months (~19 IG issuers — utilities, overseas banks, Tyson Foods among them); dealers guided to ~$40bn for the week after ~$80bn last week. Heavy IG supply typically pulls HY syndicate desks along, with issuers rushing to print ahead of Wednesday's CPI.",
+    "**Technicals turned supportive.** HY retail fund flows flipped to their largest inflow in over a month, extending a decelerating-outflow trend; combined with solid Q2 earnings this underpinned a modest grind tighter in spreads.",
+    "**Spreads remain historically rich.** HY OAS in the mid-260s bps sits near multi-year tights (vs. ~233 bps June 2007, ~259 bps early 2025), leaving limited cushion and keeping the market sensitive to macro or idiosyncratic shocks."
+  ],
+  "outlook": [
+    "**Positioning day into CPI.** Tue Aug 11 is largely a set-up session ahead of July CPI (Wed Aug 12, 8:30 ET). Expect HY firm-but-cautious with new-issue desks pushing deals out ahead of the print; a benign CPI supports a further grind tighter, a hot CPI is the main downside risk given thin spread cushion.",
+    "**Active primary slate likely** on any constructive open — refis and opportunistic prints ahead of CPI, echoing the busiest IG day since January.",
+    "**Rest-of-week catalysts:** PPI Thu Aug 13 (8:30 ET), Retail Sales Fri Aug 14 (8:30 ET), UMich prelim sentiment Fri (10:00 ET). FOMC not until Sept 16 — data, not the Fed, drives the week.",
+    "**Watch items:** (1) crude — further softness pressures the ~10%-of-index energy cohort; (2) idiosyncratic distress headlines in media/retail/healthcare (agencies flag elevated downgrade/default risk); (3) whether HY inflows persist, confirming the technical bid."
+  ],
+  "sources": [
+    "[August 10, 2026 — Bond Buyer](https://www.bondbuyer.com/digital-edition/august-10-2026)",
+    "[US High-Grade Bond Market Sees the Most Issuers Since January — Bloomberg](https://www.bloomberg.com/news/articles/2026-08-10/us-high-grade-bond-market-sees-the-most-issuers-since-january)",
+    "[ICE BofA US High Yield Index Effective Yield — FRED](https://fred.stlouisfed.org/series/BAMLH0A0HYM2EY)",
+    "[HY Credit Spread (OAS) — Convex](https://convextrade.com/metrics/bamlh0a0hym2)",
+    "[High-Yield Defaults: Canary in the Coal Mine? — Charles Schwab](https://www.schwab.com/learn/story/high-yield-defaults-canary-coal-mine)",
+    "[CPI Release Schedule — BLS / CPI Inflation Calculator](https://cpiinflationcalculator.com/cpi-release-schedule/)",
+    "[US Economic Calendar — Econoday](https://us.econoday.com/)"
+  ]
+}

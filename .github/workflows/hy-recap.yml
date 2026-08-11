@@ -1,0 +1,93 @@
+name: HY Daily Recap
+
+# Delivers the US High Yield daily recap every weekday morning.
+#
+# Schedule: 10:45 UTC, Mon–Fri.
+#   = 06:45 America/New_York during EDT (summer), 05:45 during EST (winter)
+#   → before the 07:15 AM ET deadline in both (deadline is 11:15 UTC in summer),
+#     with a buffer for GitHub's scheduled-run delays (cron can lag under load).
+#
+# This job owns the reliable delivery — GitHub runners have open internet, so
+# FRED, TRACE and SMTP all work here (unlike the restricted-egress environment a
+# scheduled Claude session runs in).
+#
+# Data:
+#   * Market levels come live from FRED (needs the FRED_API_KEY secret) with the
+#     public US Treasury API as a fallback for the 10Y/30Y.
+#   * Named best/worst bonds populate only if FINRA TRACE credentials
+#     (FINRA_API_CLIENT_ID / FINRA_API_CLIENT_SECRET secrets) or a vendor feed is
+#     configured; otherwise that section renders its template — never fabricated.
+#   * The editorial narrative (news / outlook) is not inferable from price feeds.
+#     A companion scheduled Claude session commits hy_recap/narrative_today.json
+#     ~25 min earlier; this job auto-picks it up. See hy_recap/README.md.
+#
+# The job renders the report, emails it (if SMTP secrets are set) and commits it
+# to reports/ on the default branch.
+
+on:
+  schedule:
+    - cron: "45 10 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      session_date:
+        description: "Session to recap (YYYY-MM-DD). Blank = previous business day."
+        required: false
+      narrative_path:
+        description: "Path to a narrative JSON (events/outlook/levels)."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r hy_recap/requirements.txt
+
+      - name: Generate recap (and email if SMTP secrets are set)
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          FINRA_API_CLIENT_ID: ${{ secrets.FINRA_API_CLIENT_ID }}
+          FINRA_API_CLIENT_SECRET: ${{ secrets.FINRA_API_CLIENT_SECRET }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+        run: |
+          ARGS="--email"
+          if [ -n "${{ github.event.inputs.session_date }}" ]; then
+            ARGS="$ARGS --session-date ${{ github.event.inputs.session_date }}"
+          fi
+          # Prefer an explicit dispatch input; otherwise use the narrative the
+          # companion Claude session committed this morning, if present.
+          NARR="${{ github.event.inputs.narrative_path }}"
+          if [ -z "$NARR" ] && [ -f hy_recap/narrative_today.json ]; then
+            NARR="hy_recap/narrative_today.json"
+          fi
+          if [ -n "$NARR" ]; then
+            ARGS="$ARGS --narrative $NARR"
+          fi
+          python -m hy_recap $ARGS
+
+      - name: Commit report
+        run: |
+          git config user.name  "hy-recap-bot"
+          git config user.email "hy-recap-bot@users.noreply.github.com"
+          git add reports/*.md
+          if git diff --cached --quiet; then
+            echo "No new report to commit."
+          else
+            git commit -m "HY daily recap: $(date -u +%Y-%m-%d)"
+            git push
+          fi
