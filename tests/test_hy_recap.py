@@ -181,6 +181,68 @@ def test_editorial_levels_fill_gaps_and_warn():
 
 
 @pytest.mark.unit
+def test_email_missing_config_is_reported_not_raised():
+    from hy_recap.delivery import EmailConfig, send_recap_email
+
+    cfg = EmailConfig(host=None, user=None, password=None, recipients=[])
+    sent, msg = send_recap_email("# hi", "subj", config=cfg)
+    assert sent is False
+    assert "missing config" in msg
+    assert "SMTP_HOST" in msg and "EMAIL_TO" in msg
+
+
+@pytest.mark.unit
+def test_email_html_fallback_escapes_and_wraps():
+    from hy_recap.delivery import _markdown_to_html
+
+    html = _markdown_to_html("| A | B |\n|---|---|\n| <x> | y |")
+    assert "<html>" in html and "</html>" in html
+    # Either rendered as a table (markdown lib) or escaped in a <pre> fallback.
+    assert "<table>" in html or "&lt;x&gt;" in html
+
+
+@pytest.mark.unit
+def test_email_send_path_uses_smtp(monkeypatch):
+    from hy_recap import delivery
+
+    captured = {}
+
+    class FakeSMTP:
+        def __init__(self, host, port, timeout=30):
+            captured["host"] = host
+            captured["port"] = port
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def starttls(self):
+            captured["starttls"] = True
+
+        def login(self, u, p):
+            captured["login"] = (u, p)
+
+        def send_message(self, msg):
+            captured["to"] = msg["To"]
+            captured["subject"] = msg["Subject"]
+
+    monkeypatch.setattr(delivery.smtplib, "SMTP", FakeSMTP)
+    cfg = delivery.EmailConfig(
+        host="smtp.test", port=587, user="u", password="p",
+        use_ssl=False, sender="from@test", recipients=["a@test", "b@test"],
+    )
+    sent, msg = delivery.send_recap_email("# body", "Daily Recap", config=cfg)
+    assert sent is True
+    assert captured["host"] == "smtp.test"
+    assert captured["starttls"] is True
+    assert captured["login"] == ("u", "p")
+    assert captured["to"] == "a@test, b@test"
+    assert captured["subject"] == "Daily Recap"
+
+
+@pytest.mark.unit
 def test_bondmove_render_row_handles_missing_fields():
     row = BondMove(issuer="ACME", coupon=6.5, maturity="2031-05-15",
                    price=101.25, price_change=1.1, spread_change_bps=-15, driver="beat").render_row()

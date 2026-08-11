@@ -36,6 +36,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--print", action="store_true", help="Print the Markdown to stdout."
     )
+    ap.add_argument(
+        "--email",
+        action="store_true",
+        help="Also email the recap (SMTP_* / EMAIL_TO env vars).",
+    )
     args = ap.parse_args(argv)
 
     narrative = None
@@ -50,11 +55,22 @@ def main(argv: list[str] | None = None) -> int:
         narrative=narrative,
     )
     path = gen.write(recap, output_dir=args.out)
+    markdown_body = gen.render_markdown(recap)
 
     if args.print:
-        print(gen.render_markdown(recap))
+        print(markdown_body)
     else:
         print(f"Wrote {path}")
+
+    if args.email:
+        from .delivery import send_recap_email
+
+        subject = (
+            f"US HY Daily Recap — {recap.session_date:%b %d, %Y} session "
+            f"(delivered {recap.delivery_date:%b %d})"
+        )
+        sent, detail = send_recap_email(markdown_body, subject)
+        print(("Email: " if sent else "Email skipped: ") + detail)
 
     if recap.warnings:
         print(f"\n{len(recap.warnings)} data warning(s):", file=sys.stderr)

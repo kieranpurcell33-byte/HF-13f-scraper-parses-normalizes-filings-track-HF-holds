@@ -48,13 +48,19 @@ jobs:
       - name: Install dependencies
         run: pip install -r hy_recap/requirements.txt
 
-      - name: Generate recap
+      - name: Generate recap (and email if SMTP secrets are set)
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           FINRA_API_CLIENT_ID: ${{ secrets.FINRA_API_CLIENT_ID }}
           FINRA_API_CLIENT_SECRET: ${{ secrets.FINRA_API_CLIENT_SECRET }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
         run: |
-          ARGS=""
+          ARGS="--email"
           if [ -n "${{ github.event.inputs.session_date }}" ]; then
             ARGS="$ARGS --session-date ${{ github.event.inputs.session_date }}"
           fi

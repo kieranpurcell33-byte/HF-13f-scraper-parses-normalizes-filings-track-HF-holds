@@ -73,10 +73,32 @@ weekday-morning Claude session (a Routine / scheduled trigger) that:
 1. researches the prior session's HY news and forward calendar,
 2. writes a `narrative.json` (events, outlook, sources, and — if feeds are down —
    `levels`),
-3. runs `python -m hy_recap --narrative narrative.json`, and
+3. runs `python -m hy_recap --narrative narrative.json --email`, and
 4. commits the report.
 
 Example cron for ~06:45 ET (10:45 UTC): `45 10 * * 1-5`.
+
+## Email delivery
+
+Both automations email the recap when the `--email` flag is passed and SMTP
+secrets are configured (see `delivery.py`). Delivery is self-contained SMTP — no
+external connector required:
+
+| Var | Meaning |
+|---|---|
+| `SMTP_HOST` | e.g. `smtp.gmail.com` |
+| `SMTP_PORT` | `587` (STARTTLS, default) or `465` (with `SMTP_USE_SSL=1`) |
+| `SMTP_USER` / `SMTP_PASSWORD` | login (use an app password for Gmail) |
+| `EMAIL_FROM` | from address (defaults to `SMTP_USER`) |
+| `EMAIL_TO` | comma-separated recipients (required to send) |
+
+If any required var is missing, delivery is skipped with a logged reason — it
+never breaks report generation. The email is multipart: a rendered HTML body
+plus a plain-text (raw Markdown) fallback.
+
+```bash
+python -m hy_recap --narrative narrative.json --email
+```
 
 ---
 
