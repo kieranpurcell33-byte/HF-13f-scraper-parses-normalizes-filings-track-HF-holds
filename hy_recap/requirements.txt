@@ -1,0 +1,7 @@
+# Runtime dependencies for the hy_recap daily-recap pipeline.
+# (All are already part of the repo's top-level requirements.txt; this file lets
+#  the recap job install a minimal set in isolation.)
+requests>=2.31.0
+pydantic>=2.0.0
+tenacity>=8.2.0
+python-dotenv>=1.0.0
