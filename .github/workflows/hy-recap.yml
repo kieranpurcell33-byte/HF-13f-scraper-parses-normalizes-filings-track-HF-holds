@@ -2,10 +2,14 @@ name: HY Daily Recap
 
 # Delivers the US High Yield daily recap every weekday morning.
 #
-# Schedule: 10:15 UTC, Mon–Fri.
-#   = 06:15 America/New_York during EDT (summer), 05:15 during EST (winter)
-#   → comfortably before the 07:15 AM ET delivery deadline in both, with a
-#     buffer for GitHub's scheduled-run delays (cron can lag under load).
+# Schedule: 10:45 UTC, Mon–Fri.
+#   = 06:45 America/New_York during EDT (summer), 05:45 during EST (winter)
+#   → before the 07:15 AM ET deadline in both (deadline is 11:15 UTC in summer),
+#     with a buffer for GitHub's scheduled-run delays (cron can lag under load).
+#
+# This job owns the reliable delivery — GitHub runners have open internet, so
+# FRED, TRACE and SMTP all work here (unlike the restricted-egress environment a
+# scheduled Claude session runs in).
 #
 # Data:
 #   * Market levels come live from FRED (needs the FRED_API_KEY secret) with the
@@ -14,14 +18,15 @@ name: HY Daily Recap
 #     (FINRA_API_CLIENT_ID / FINRA_API_CLIENT_SECRET secrets) or a vendor feed is
 #     configured; otherwise that section renders its template — never fabricated.
 #   * The editorial narrative (news / outlook) is not inferable from price feeds.
-#     Supply it via a committed narrative JSON, or (recommended) generate the full
-#     recap from a scheduled Claude session — see hy_recap/README.md.
+#     A companion scheduled Claude session commits hy_recap/narrative_today.json
+#     ~25 min earlier; this job auto-picks it up. See hy_recap/README.md.
 #
-# The job commits the generated report to reports/ on the default branch.
+# The job renders the report, emails it (if SMTP secrets are set) and commits it
+# to reports/ on the default branch.
 
 on:
   schedule:
-    - cron: "15 10 * * 1-5"
+    - cron: "45 10 * * 1-5"
   workflow_dispatch:
     inputs:
       session_date:
@@ -64,8 +69,14 @@ jobs:
           if [ -n "${{ github.event.inputs.session_date }}" ]; then
             ARGS="$ARGS --session-date ${{ github.event.inputs.session_date }}"
           fi
-          if [ -n "${{ github.event.inputs.narrative_path }}" ]; then
-            ARGS="$ARGS --narrative ${{ github.event.inputs.narrative_path }}"
+          # Prefer an explicit dispatch input; otherwise use the narrative the
+          # companion Claude session committed this morning, if present.
+          NARR="${{ github.event.inputs.narrative_path }}"
+          if [ -z "$NARR" ] && [ -f hy_recap/narrative_today.json ]; then
+            NARR="hy_recap/narrative_today.json"
+          fi
+          if [ -n "$NARR" ]; then
+            ARGS="$ARGS --narrative $NARR"
           fi
           python -m hy_recap $ARGS
 
