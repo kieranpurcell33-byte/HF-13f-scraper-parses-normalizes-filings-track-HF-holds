@@ -121,3 +121,120 @@ def test_unknown_source_raises(monkeypatch):
     monkeypatch.setenv("HY_MACRO_SOURCE", "does-not-exist")
     with pytest.raises(ValueError):
         RecapBuilder(config=RecapConfig())
+
+
+# --- Google Drive delivery -------------------------------------------------
+
+class _FakeExecutable:
+    def __init__(self, result):
+        self._result = result
+
+    def execute(self):
+        return self._result
+
+
+class _FakeFiles:
+    def __init__(self, recorder):
+        self.recorder = recorder
+
+    def create(self, **kwargs):
+        self.recorder["create"] = kwargs
+        return _FakeExecutable({
+            "id": "fake-id-123",
+            "name": kwargs["body"]["name"],
+            "webViewLink": "https://drive.google.com/file/d/fake-id-123",
+        })
+
+
+class _FakePermissions:
+    def __init__(self, recorder):
+        self.recorder = recorder
+
+    def create(self, **kwargs):
+        self.recorder.setdefault("permissions", []).append(kwargs)
+        return _FakeExecutable({"id": "perm-1"})
+
+
+class _FakeDriveService:
+    def __init__(self):
+        self.recorder = {}
+
+    def files(self):
+        return _FakeFiles(self.recorder)
+
+    def permissions(self):
+        return _FakePermissions(self.recorder)
+
+
+def _write_sample_md(tmp_path, session=date(2026, 8, 10)):
+    report = RecapBuilder().build(session_date=session)
+    md = render_markdown(report)
+    return write_recap(md, report.session_date, output_dir=str(tmp_path))
+
+
+def test_drive_upload_uses_injected_service(tmp_path):
+    from hy_recap.delivery_gdrive import upload_markdown_to_drive
+
+    path = _write_sample_md(tmp_path)
+    svc = _FakeDriveService()
+    result = upload_markdown_to_drive(
+        path,
+        folder_id="folder-abc",
+        share_with=["a@b.com"],
+        service=svc,
+        media_factory=lambda p: object(),
+    )
+
+    assert result.file_id == "fake-id-123"
+    assert result.web_view_link.endswith("fake-id-123")
+    assert svc.recorder["create"]["body"]["parents"] == ["folder-abc"]
+    assert svc.recorder["create"]["body"]["name"] == "hy_recap_2026-08-10.md"
+    assert svc.recorder["permissions"][0]["body"]["emailAddress"] == "a@b.com"
+
+
+def test_drive_upload_as_google_doc_strips_extension(tmp_path):
+    from hy_recap.delivery_gdrive import upload_markdown_to_drive
+
+    path = _write_sample_md(tmp_path)
+    svc = _FakeDriveService()
+    upload_markdown_to_drive(
+        path,
+        folder_id="f",
+        as_google_doc=True,
+        service=svc,
+        media_factory=lambda p: object(),
+    )
+
+    body = svc.recorder["create"]["body"]
+    assert body["name"] == "hy_recap_2026-08-10"  # no .md
+    assert body["mimeType"] == "application/vnd.google-apps.document"
+
+
+def test_drive_upload_missing_file_raises(tmp_path):
+    from hy_recap.delivery_gdrive import upload_markdown_to_drive
+
+    with pytest.raises(FileNotFoundError):
+        upload_markdown_to_drive(
+            tmp_path / "nope.md", service=_FakeDriveService()
+        )
+
+
+def test_deliver_routes_drive_scheme(tmp_path, monkeypatch):
+    import hy_recap.delivery as delivery
+
+    path = _write_sample_md(tmp_path)
+    calls = {}
+
+    def fake_upload(p, folder_id=None, **kwargs):
+        calls["path"] = p
+        calls["folder_id"] = folder_id
+        from hy_recap.delivery_gdrive import DriveUploadResult
+
+        return DriveUploadResult(file_id="x", name="n", web_view_link="link")
+
+    monkeypatch.setattr(
+        "hy_recap.delivery_gdrive.upload_markdown_to_drive", fake_upload
+    )
+    delivery.deliver(path, "drive:my-folder")
+    assert calls["folder_id"] == "my-folder"
+    assert calls["path"] == path

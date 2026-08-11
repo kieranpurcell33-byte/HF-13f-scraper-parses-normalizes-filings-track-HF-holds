@@ -65,6 +65,16 @@ class RecapConfig:
     )
     delivery_deadline: str = field(default_factory=lambda: _get("HY_DELIVERY_DEADLINE", "07:15"))
 
+    # Google Drive delivery (service account; see hy_recap/delivery_gdrive.py)
+    drive_folder_id: Optional[str] = field(default_factory=lambda: _get("HY_DRIVE_FOLDER_ID"))
+    drive_as_doc: bool = field(
+        default_factory=lambda: (_get("HY_DRIVE_AS_DOC", "") or "").lower()
+        in ("1", "true", "yes")
+    )
+    google_credentials_path: Optional[str] = field(
+        default_factory=lambda: _get("GOOGLE_APPLICATION_CREDENTIALS")
+    )
+
     def missing_credentials(self) -> list[str]:
         """Return the credentials a non-sample run still needs.
 

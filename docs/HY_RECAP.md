@@ -113,9 +113,14 @@ be installed on the runner — keep them off the public CI image.
 ### Option A — GitHub Actions (committed)
 
 `.github/workflows/hy-recap.yml` runs weekdays at **10:30 UTC** (06:30 EDT /
-05:30 EST — before the 07:15 ET deadline in both) and uploads the recap as a
-build artifact. Configure feed selection via repo **Variables** (`HY_*_SOURCE`,
-`HY_REST_BASE_URL`) and keys via repo **Secrets** (`HY_REST_API_KEY`, etc.).
+05:30 EST — before the 07:15 ET deadline in both), uploads the recap as a build
+artifact, and delivers to Google Drive when configured. Set:
+
+- **Variables:** `HY_*_SOURCE`, `HY_REST_BASE_URL`, `HY_DRIVE_FOLDER_ID`
+  (delivery to Drive is enabled automatically when this is set), `HY_DRIVE_AS_DOC`.
+- **Secrets:** `HY_REST_API_KEY` (and `ICE_API_KEY` / `FINRA_TRACE_API_KEY` if
+  used), plus `GDRIVE_SERVICE_ACCOUNT_JSON` — the full service-account JSON key,
+  written to a temp file at runtime.
 
 > Actions' scheduled runs can start several minutes late under load. For a hard
 > deadline, use Option B.
@@ -132,14 +137,33 @@ CRON_TZ=America/New_York
 
 ### Delivery destination
 
-`delivery.py` writes the file and then calls a **hook** (`deliver`). Wire your
-destination there — e.g. upload to Google Drive (the Drive connector),
-email/SMTP, S3, or a Slack post — reading the destination from
-`--deliver <DEST>` or an env var so credentials stay in the scheduler, not the
-repo.
+`delivery.py` writes the file and then calls `deliver(path, destination)`, which
+routes on a scheme prefix. Credentials always come from the environment.
 
-> Note: the Google Drive connector in this workspace currently needs
-> re-authorization before automated uploads will work.
+**Google Drive** (implemented, `--deliver drive[:<folder_id>]`):
+
+```bash
+pip install -r requirements-drive.txt
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+export HY_DRIVE_FOLDER_ID=<folder id>          # or pass drive:<folder id>
+python -m hy_recap --write --deliver drive
+```
+
+One-time setup: create a Google Cloud **service account**, download its JSON
+key, enable the Drive API, and share the target folder with the service
+account's email (`…@….iam.gserviceaccount.com`) as **Editor** (for a Shared
+Drive, add it as a member). A service account is required because the 07:15 ET
+job runs unattended — interactive OAuth connectors don't work headless. Set
+`HY_DRIVE_AS_DOC=true` to convert the Markdown into a native Google Doc instead
+of storing the raw `.md`. See `hy_recap/delivery_gdrive.py`.
+
+Other destinations (email/SMTP, S3, Slack) can be added as new schemes in
+`deliver()`.
+
+> Note: the interactive Google Drive *connector* in this workspace is separate
+> from the service-account path above and may need re-authorization for
+> session-side use; the scheduled job relies on the service account, not the
+> connector.
 
 ## Data provenance
 

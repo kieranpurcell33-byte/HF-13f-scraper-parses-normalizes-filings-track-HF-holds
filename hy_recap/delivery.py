@@ -12,6 +12,7 @@ in this module. See ``docs/HY_RECAP.md`` for wiring the 07:15 ET job.
 from __future__ import annotations
 
 import logging
+import os
 from datetime import date
 from pathlib import Path
 from typing import Optional
@@ -41,12 +42,29 @@ def write_recap(
 def deliver(path: Path, destination: Optional[str] = None) -> None:
     """Hand the written file to an external destination.
 
-    This is a hook, not an implementation: it logs by default. Wire your
-    Google Drive / email / Slack push here (the Drive MCP connector, an SMTP
-    call, etc.). Kept credential-free so nothing sensitive lands in the repo.
+    Destination is a scheme-prefixed string so one flag can target different
+    backends. Credentials always come from the environment, never arguments:
+
+      * ``drive`` or ``drive:<folder_id>`` -> upload to Google Drive
+        (service account; see ``delivery_gdrive``). Without an explicit folder
+        id, ``HY_DRIVE_FOLDER_ID`` is used.
+      * anything else -> logged as an unrecognized destination (extend below
+        for email / Slack / S3).
     """
     if not destination:
         logger.info("No delivery destination configured; file left at %s", path)
         return
-    logger.info("Delivery hook invoked for destination=%s, file=%s", destination, path)
-    # e.g. upload_to_drive(path, folder_id=destination) — implement per your stack.
+
+    scheme, _, arg = destination.partition(":")
+    if scheme == "drive":
+        # Imported lazily so non-Drive runs don't require the Google deps.
+        from hy_recap.delivery_gdrive import upload_markdown_to_drive
+
+        as_doc = os.environ.get("HY_DRIVE_AS_DOC", "").lower() in ("1", "true", "yes")
+        result = upload_markdown_to_drive(
+            path, folder_id=arg or None, as_google_doc=as_doc
+        )
+        logger.info("Delivered to Google Drive: %s", result.web_view_link or result.file_id)
+        return
+
+    logger.warning("Unrecognized delivery destination '%s'; file left at %s", destination, path)

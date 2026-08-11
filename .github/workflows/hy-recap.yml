@@ -28,9 +28,21 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          # Google Drive delivery deps (no-op if you deliver elsewhere).
+          pip install -r requirements-drive.txt
 
-      - name: Generate recap
+      - name: Write Google service-account key
+        env:
+          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -n "$GDRIVE_SERVICE_ACCOUNT_JSON" ]; then
+            printf '%s' "$GDRIVE_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/gdrive-sa.json"
+            echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gdrive-sa.json" >> "$GITHUB_ENV"
+          fi
+
+      - name: Generate & deliver recap
         env:
           HY_MACRO_SOURCE: ${{ vars.HY_MACRO_SOURCE || 'sample' }}
           HY_BOND_SOURCE: ${{ vars.HY_BOND_SOURCE || 'sample' }}
@@ -40,12 +52,18 @@ jobs:
           HY_REST_API_KEY: ${{ secrets.HY_REST_API_KEY }}
           ICE_API_KEY: ${{ secrets.ICE_API_KEY }}
           FINRA_TRACE_API_KEY: ${{ secrets.FINRA_TRACE_API_KEY }}
+          HY_DRIVE_FOLDER_ID: ${{ vars.HY_DRIVE_FOLDER_ID }}
+          HY_DRIVE_AS_DOC: ${{ vars.HY_DRIVE_AS_DOC }}
         run: |
+          args="--write --verbose"
           if [ -n "${{ github.event.inputs.date }}" ]; then
-            python -m hy_recap --date "${{ github.event.inputs.date }}" --write --verbose
-          else
-            python -m hy_recap --write --verbose
+            args="--date ${{ github.event.inputs.date }} $args"
           fi
+          # Deliver to Drive only when a folder id is configured.
+          if [ -n "${HY_DRIVE_FOLDER_ID}" ]; then
+            args="$args --deliver drive"
+          fi
+          python -m hy_recap $args
 
       - name: Upload recap artifact
         uses: actions/upload-artifact@v4
