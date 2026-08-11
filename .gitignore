@@ -1,0 +1,5 @@
+# hy_recap local artifacts
+.env
+output/hy_recap/
+__pycache__/
+*.pyc

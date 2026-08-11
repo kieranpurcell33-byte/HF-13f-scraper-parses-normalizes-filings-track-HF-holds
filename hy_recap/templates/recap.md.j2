@@ -1,0 +1,86 @@
+{%- macro pct(v) -%}{% if v is not none %}{{ '%+.2f'|format(v) }}%{% else %}n/a{% endif %}{%- endmacro -%}
+{%- macro bp(v) -%}{% if v is not none %}{{ '%.0f'|format(v) }}bp{% else %}n/a{% endif %}{%- endmacro -%}
+{%- macro bpchg(v) -%}{% if v is not none %}{{ '%+.0f'|format(v) }}bp{% else %}n/a{% endif %}{%- endmacro -%}
+{%- macro px(v) -%}{% if v is not none %}{{ '%.2f'|format(v) }}{% else %}n/a{% endif %}{%- endmacro -%}
+# US High Yield Daily Recap — {{ report.session_date.strftime('%A, %B %d, %Y') }}
+
+_Generated {{ report.generated_at.strftime('%Y-%m-%d %H:%M UTC') }}. Covers the prior trading session._
+
+{{ report.executive_summary }}
+
+## 1. Notable events & news
+{% if report.notable_news %}
+{% for n in report.notable_news %}
+- **{{ n.headline }}**{% if n.category %} _({{ n.category }})_{% endif %}{% if n.summary %} — {{ n.summary }}{% endif %}{% if n.source %} [{{ n.source }}{% if n.url %}]({{ n.url }}){% else %}]{% endif %}{% endif %}{{ '' }}
+{% endfor %}
+{% else %}
+- No standout headlines flagged for the session.
+{% endif %}
+
+## 2. Best & worst performing HY bonds
+
+### 🟢 Top gainers
+{% if report.top_performers %}
+| Issuer | Bond | Sector | Rating | Price | Δ Price | Spread | Δ Spread | Total return | Why |
+|---|---|---|---|---:|---:|---:|---:|---:|---|
+{% for b in report.top_performers -%}
+| {{ b.issuer }} | {{ b.description or '—' }} | {{ b.sector or '—' }} | {{ b.rating or '—' }} | {{ px(b.price) }} | {% if b.price_chg is not none %}{{ '%+.2f'|format(b.price_chg) }}{% else %}n/a{% endif %} | {{ bp(b.spread_bps) }} | {{ bpchg(b.spread_chg_bps) }} | {{ pct(b.total_return_pct) }} | {{ b.reason }} |
+{% endfor %}
+{% else %}
+_No gainer data from the configured feed._
+{% endif %}
+
+### 🔴 Top decliners
+{% if report.bottom_performers %}
+| Issuer | Bond | Sector | Rating | Price | Δ Price | Spread | Δ Spread | Total return | Why |
+|---|---|---|---|---:|---:|---:|---:|---:|---|
+{% for b in report.bottom_performers -%}
+| {{ b.issuer }} | {{ b.description or '—' }} | {{ b.sector or '—' }} | {{ b.rating or '—' }} | {{ px(b.price) }} | {% if b.price_chg is not none %}{{ '%+.2f'|format(b.price_chg) }}{% else %}n/a{% endif %} | {{ bp(b.spread_bps) }} | {{ bpchg(b.spread_chg_bps) }} | {{ pct(b.total_return_pct) }} | {{ b.reason }} |
+{% endfor %}
+{% else %}
+_No decliner data from the configured feed._
+{% endif %}
+
+## 3. Market context
+
+| Metric | Level | Day change |
+|---|---:|---:|
+| {{ report.macro.hy_index_name }} OAS | {{ bp(report.macro.hy_oas_bps) }} | {{ bpchg(report.macro.hy_oas_chg_bps) }} |
+| HY effective yield | {% if report.macro.hy_yield_pct is not none %}{{ '%.2f'|format(report.macro.hy_yield_pct) }}%{% else %}n/a{% endif %} | — |
+| HY index total return | — | {{ pct(report.macro.hy_total_return_pct) }} |
+| CDX.NA.HY | {{ px(report.macro.cdx_hy_price) }} | {% if report.macro.cdx_hy_chg is not none %}{{ '%+.2f'|format(report.macro.cdx_hy_chg) }}{% else %}n/a{% endif %} |
+| IG OAS | {{ bp(report.macro.ig_oas_bps) }} | — |
+| UST 2Y / 10Y / 30Y | {% if report.macro.ust_2y is not none %}{{ '%.2f'|format(report.macro.ust_2y) }}%{% else %}n/a{% endif %} / {% if report.macro.ust_10y is not none %}{{ '%.2f'|format(report.macro.ust_10y) }}%{% else %}n/a{% endif %} / {% if report.macro.ust_30y is not none %}{{ '%.2f'|format(report.macro.ust_30y) }}%{% else %}n/a{% endif %} | — |
+| HY fund flow | {% if report.macro.fund_flow_usd is not none %}${{ '%.2f'|format(report.macro.fund_flow_usd/1e9) }}B{% else %}n/a{% endif %} | — |
+| HY new issue | {% if report.macro.new_issue_volume_usd is not none %}${{ '%.2f'|format(report.macro.new_issue_volume_usd/1e9) }}B{% else %}n/a{% endif %} | — |
+| S&P 500 | — | {{ pct(report.macro.sp500_chg_pct) }} |
+
+## 4. Expected for the next trading day — {{ report.outlook.next_session_date.strftime('%A, %B %d, %Y') }}
+{% if report.outlook.summary %}
+{{ report.outlook.summary }}
+{% endif %}
+{% if report.outlook.economic_calendar %}
+**Economic calendar**
+{% for item in report.outlook.economic_calendar %}
+- {{ item.label }}{% if item.detail %} — {{ item.detail }}{% endif %}{{ '' }}
+{% endfor %}
+{% endif %}
+{% if report.outlook.primary_pipeline %}
+**Primary market**
+{% for item in report.outlook.primary_pipeline %}
+- {{ item.label }}{% if item.detail %} — {{ item.detail }}{% endif %}{{ '' }}
+{% endfor %}
+{% endif %}
+{% if report.outlook.themes %}
+**Themes to watch**
+{% for item in report.outlook.themes %}
+- {{ item.label }}{% if item.detail %} — {{ item.detail }}{% endif %}{{ '' }}
+{% endfor %}
+{% endif %}
+
+---
+{% if report.data_caveats %}
+{% for c in report.data_caveats %}
+> {{ c }}
+{% endfor %}
+{% endif %}
