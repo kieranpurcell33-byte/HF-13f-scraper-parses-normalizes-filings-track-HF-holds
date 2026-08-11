@@ -1,0 +1,73 @@
+name: HY Daily Recap
+
+# Delivers the US high-yield bond daily recap every weekday before 07:15 ET.
+#
+# GitHub Actions cron is in UTC. 10:30 UTC lands at 06:30 EDT (summer) and
+# 05:30 EST (winter) -- both comfortably before the 07:15 ET deadline, and
+# early enough to absorb Actions' scheduling jitter (runs can start several
+# minutes late under load). If you need a hard guarantee, prefer a dedicated
+# scheduler (see docs/HY_RECAP.md).
+on:
+  schedule:
+    - cron: "30 10 * * 1-5"   # Mon-Fri, 10:30 UTC
+  workflow_dispatch:           # allow manual runs
+    inputs:
+      date:
+        description: "Session to recap (YYYY-MM-DD). Blank = previous trading day."
+        required: false
+        default: ""
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          # Google Drive delivery deps (no-op if you deliver elsewhere).
+          pip install -r requirements-drive.txt
+
+      - name: Write Google service-account key
+        env:
+          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -n "$GDRIVE_SERVICE_ACCOUNT_JSON" ]; then
+            printf '%s' "$GDRIVE_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/gdrive-sa.json"
+            echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gdrive-sa.json" >> "$GITHUB_ENV"
+          fi
+
+      - name: Generate & deliver recap
+        env:
+          HY_MACRO_SOURCE: ${{ vars.HY_MACRO_SOURCE || 'sample' }}
+          HY_BOND_SOURCE: ${{ vars.HY_BOND_SOURCE || 'sample' }}
+          HY_NEWS_SOURCE: ${{ vars.HY_NEWS_SOURCE || 'sample' }}
+          HY_OUTLOOK_SOURCE: ${{ vars.HY_OUTLOOK_SOURCE || 'sample' }}
+          HY_REST_BASE_URL: ${{ vars.HY_REST_BASE_URL }}
+          HY_REST_API_KEY: ${{ secrets.HY_REST_API_KEY }}
+          ICE_API_KEY: ${{ secrets.ICE_API_KEY }}
+          FINRA_TRACE_API_KEY: ${{ secrets.FINRA_TRACE_API_KEY }}
+          HY_DRIVE_FOLDER_ID: ${{ vars.HY_DRIVE_FOLDER_ID }}
+          HY_DRIVE_AS_DOC: ${{ vars.HY_DRIVE_AS_DOC }}
+        run: |
+          args="--write --verbose"
+          if [ -n "${{ github.event.inputs.date }}" ]; then
+            args="--date ${{ github.event.inputs.date }} $args"
+          fi
+          # Deliver to Drive only when a folder id is configured.
+          if [ -n "${HY_DRIVE_FOLDER_ID}" ]; then
+            args="$args --deliver drive"
+          fi
+          python -m hy_recap $args
+
+      - name: Upload recap artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hy-recap
+          path: output/hy_recap/*.md
+          if-no-files-found: error
